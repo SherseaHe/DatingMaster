@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceGenius | 智能语音转文字分析</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="nav-header">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-microphone-alt"></i>
+                <span>VoiceGenius</span>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active">首页</a></li>
+                    <li><a href="#">功能</a></li>
+                    <li><a href="#">关于</a></li>
+                    <li><a href="#">帮助</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h1>语音转文字的未来体验</h1>
+            <p>基于科大讯飞先进的语音识别与星火大模型，提供专业的语音转文字与智能分析服务</p>
+        </div>
+    </section>
+
+    <main class="container">
+        <section class="app-section">
+            <div class="section-header">
+                <h2>开始录音</h2>
+                <div class="status-display">
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span id="statusLabel">就绪</span>
+                    </div>
+                    <span id="recordingTime" class="time">00:00</span>
+                </div>
+            </div>
+            
+            <div class="control-panel">
+                <button id="startRecordBtn" class="btn btn-primary">
+                    <i class="fas fa-microphone"></i>
+                    <span>开始录音</span>
+                </button>
+                <button id="stopRecordBtn" class="btn btn-danger" disabled>
+                    <i class="fas fa-stop-circle"></i>
+                    <span>停止录音</span>
+                </button>
+            </div>
+            
+            <div class="result-container">
+                <div class="section-header">
+                    <h2>识别结果</h2>
+                    <div class="action-buttons">
+                        <button id="copyBtn" class="btn btn-icon" title="复制文本">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <button id="clearBtn" class="btn btn-icon" title="清空文本">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <button id="downloadBtn" class="btn btn-icon" title="下载文本">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="resultText" class="result-text"></div>
+                <button id="analyzeBtn" class="btn btn-analyze">
+                    <i class="fas fa-brain"></i>
+                    <span>智能分析</span>
+                </button>
+            </div>
+            
+            <div class="analysis-container" id="analysisContainer" style="display: none;">
+                <div class="section-header">
+                    <h2>星火大模型分析</h2>
+                </div>
+                <div class="analysis-options">
+                    <div class="analysis-type-selector">
+                        <select id="analysisType" class="analysis-select">
+                            <option value="summary">内容摘要</option>
+                            <option value="sentiment">情感分析</option>
+                            <option value="keywords">关键词提取</option>
+                            <option value="qa">智能问答</option>
+                        </select>
+                        <i class="fas fa-chevron-down select-arrow"></i>
+                    </div>
+                    <div id="qaInputContainer" style="display: none;">
+                        <input type="text" id="qaInput" class="qa-input" placeholder="请输入您的问题">
+                    </div>
+                    <button id="runAnalysisBtn" class="btn btn-primary">
+                        <i class="fas fa-play"></i>
+                        <span>开始分析</span>
+                    </button>
+                </div>
+                <div id="analysisResult" class="analysis-result">
+                    <div class="loading" id="analysisLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>正在分析中，请稍候...</p>
+                    </div>
+                    <div id="analysisContent" class="analysis-content"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <section class="features">
+        <div class="container">
+            <h2>强大功能</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-microphone"></i>
+                    </div>
+                    <h3>实时语音转文字</h3>
+                    <p>科大讯飞强大的语音识别技术，高精度实时转换您的语音</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h3>星火大模型分析</h3>
+                    <p>利用先进的AI大模型，深入分析文本内容，提取关键信息</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>情感分析</h3>
+                    <p>智能识别文本情感倾向，理解内容的情绪表达</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-question-circle"></i>
+                    </div>
+                    <h3>智能问答</h3>
+                    <p>基于文本内容，回答您的问题，提供深入见解</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <i class="fas fa-microphone-alt"></i>
+                    <span>VoiceGenius</span>
+                </div>
+                <p>基于科大讯飞API的智能语音转文字与分析应用</p>
+                <div class="footer-links">
+                    <a href="#">隐私政策</a>
+                    <a href="#">使用条款</a>
+                    <a href="#">联系我们</a>
+                </div>
+                <p class="copyright">© 2023 VoiceGenius. 保留所有权利。</p>
+            </div>
+        </div>
+    </footer>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="recorder.js"></script>
+    <script src="sparkapi.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 
