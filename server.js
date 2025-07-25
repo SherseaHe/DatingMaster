@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 // 导入路由
 const chatRoutes = require('./routes/chat');
 const speechRoutes = require('./routes/speech');
+const voiceChatRoutes = require('./routes/voiceChat');
 const { authenticateApiKey } = require('./middleware/auth');
 
 const app = express();
@@ -65,7 +66,12 @@ app.get('/api/info', (req, res) => {
         'POST /api/speech/transcribe': '语音转文字',
         'POST /api/speech/transcribe-and-chat': '语音对话（语音→文字→AI回复）',
         'GET /api/speech/formats': '支持的音频格式',
-        'GET /api/speech/providers': '语音识别服务商'
+        'GET /api/speech/providers': '语音识别服务商',
+        'POST /api/voice-chat/process': '集成语音对话（audio2text+Kimi）',
+        'POST /api/voice-chat/contextual': '多轮语音对话',
+        'POST /api/voice-chat/stream': '流式语音对话',
+        'POST /api/voice-chat/batch': '批量语音处理',
+        'GET /api/voice-chat/status': '语音对话服务状态'
       }
     }
   });
@@ -74,6 +80,7 @@ app.get('/api/info', (req, res) => {
 // 应用认证中间件到API路由
 app.use('/api/chat', authenticateApiKey, chatRoutes);
 app.use('/api/speech', authenticateApiKey, speechRoutes);
+app.use('/api/voice-chat', authenticateApiKey, voiceChatRoutes);
 
 // 404处理
 app.use('*', (req, res) => {
