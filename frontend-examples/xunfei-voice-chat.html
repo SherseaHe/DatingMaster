@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>讯飞语音对话 + Kimi AI 测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #48bb78;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #48bb78;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(72, 187, 120, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
+        }
+        
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #f7fafc;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #ebf4ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #ebf4ff;
+            transform: scale(1.02);
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-container {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            margin: 20px 0;
+        }
+        
+        .result-section {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .result-section h4 {
+            margin-top: 0;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .error {
+            background: #fed7d7;
+            border-left-color: #e53e3e;
+            color: #742a2a;
+        }
+        
+        .success {
+            background: #c6f6d5;
+            border-left-color: #38a169;
+            color: #22543d;
+        }
+        
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e2e8f0;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .workflow-step {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .workflow-step.active {
+            border-color: #667eea;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        
+        .workflow-step.completed {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+        
+        .audio-info {
+            background: #ebf4ff;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #2b6cb0;
+        }
+        
+        .conversation-history {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .message.user {
+            background: #ebf4ff;
+            margin-left: 20px;
+        }
+        
+        .message.assistant {
+            background: #f0fff4;
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎤 讯飞语音对话 + Kimi AI</h1>
+        <p>基于讯飞语音识别API和Kimi AI的智能语音对话系统</p>
+    </div>
+
+    <div class="container">
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span>服务状态：在线</span>
+            </div>
+            <button onclick="testIntegration()" style="padding: 8px 16px; font-size: 14px;">
+                🧪 测试集成
+            </button>
+        </div>
+
+        <div class="workflow-steps">
+            <div class="workflow-step" id="step1">
+                <div style="font-size: 24px; margin-bottom: 5px;">🎵</div>
+                <div>1. 上传音频</div>
+            </div>
+            <div class="workflow-step" id="step2">
+                <div style="font-size: 24px; margin-bottom: 5px;">🎤</div>
+                <div>2. 讯飞识别</div>
+            </div>
+            <div class="workflow-step" id="step3">
+                <div style="font-size: 24px; margin-bottom: 5px;">🤖</div>
+                <div>3. Kimi AI</div>
+            </div>
+            <div class="workflow-step" id="step4">
+                <div style="font-size: 24px; margin-bottom: 5px;">💬</div>
+                <div>4. 返回结果</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎵 语音文件上传</h2>
+        
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('audioFile').click()">
+            <div style="font-size: 48px; margin-bottom: 10px;">🎤</div>
+            <div style="font-size: 18px; margin-bottom: 10px;">点击选择音频文件或拖拽文件到此处</div>
+            <div style="color: #718096; font-size: 14px;">
+                支持格式：WAV, MP3, M4A, FLAC (最大50MB)
+            </div>
+            <input type="file" id="audioFile" accept="audio/*" style="display: none;">
+        </div>
+
+        <div id="audioInfo" class="audio-info" style="display: none;"></div>
+
+        <div class="input-group">
+            <label for="language">语言:</label>
+            <select id="language">
+                <option value="zh_cn">中文</option>
+                <option value="en_us">英文</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="model">Kimi模型:</label>
+            <select id="model">
+                <option value="moonshot-v1-8k">moonshot-v1-8k</option>
+                <option value="moonshot-v1-32k">moonshot-v1-32k</option>
+                <option value="moonshot-v1-128k">moonshot-v1-128k</option>
+            </select>
+        </div>
+
+        <button onclick="processVoiceChat()" id="processBtn" disabled>
+            🚀 开始语音对话
+        </button>
+    </div>
+
+    <div class="container">
+        <h2>📊 处理结果</h2>
+        <div id="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>💬 多轮对话</h2>
+        <div class="conversation-history" id="conversationHistory">
+            <div style="text-align: center; color: #718096; padding: 20px;">
+                暂无对话历史
+            </div>
+        </div>
+        <button onclick="processContextualChat()" id="contextualBtn" disabled>
+            🔄 继续对话
+        </button>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let conversationHistory = [];
+
+        // 文件上传处理
+        document.getElementById('audioFile').addEventListener('change', handleFileSelect);
+        
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('drop', handleDrop);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                currentFile = file;
+                showAudioInfo(file);
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('contextualBtn').disabled = false;
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                currentFile = files[0];
+                showAudioInfo(currentFile);
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('contextualBtn').disabled = false;
+            }
+        }
+
+        function handleDragLeave(event) {
+            uploadArea.classList.remove('dragover');
+        }
+
+        function showAudioInfo(file) {
+            const audioInfo = document.getElementById('audioInfo');
+            audioInfo.style.display = 'block';
+            audioInfo.innerHTML = `
+                <strong>📁 文件信息：</strong><br>
+                文件名：${file.name}<br>
+                大小：${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                类型：${file.type}
+            `;
+        }
+
+        function updateWorkflowStep(stepNumber, status = 'active') {
+            // 重置所有步骤
+            for (let i = 1; i <= 4; i++) {
+                const step = document.getElementById(`step${i}`);
+                step.classList.remove('active', 'completed');
+            }
+
+            // 设置当前步骤
+            for (let i = 1; i <= stepNumber; i++) {
+                const step = document.getElementById(`step${i}`);
+                if (i < stepNumber) {
+                    step.classList.add('completed');
+                } else if (i === stepNumber) {
+                    step.classList.add(status);
+                }
+            }
+        }
+
+        async function processVoiceChat() {
+            if (!currentFile) {
+                alert('请先选择音频文件');
+                return;
+            }
+
+            const processBtn = document.getElementById('processBtn');
+            const originalText = processBtn.innerHTML;
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<div class="loading"><div class="spinner"></div>处理中...</div>';
+
+            updateWorkflowStep(1, 'active');
+
+            try {
+                const formData = new FormData();
+                formData.append('audio', currentFile);
+                formData.append('language', document.getElementById('language').value);
+                formData.append('model', document.getElementById('model').value);
+
+                updateWorkflowStep(2, 'active');
+
+                const response = await fetch('/api/voice-chat/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                updateWorkflowStep(4, 'completed');
+
+                if (result.success) {
+                    showResult(result, false);
+                    
+                    // 添加到对话历史
+                    conversationHistory.push(
+                        { role: 'user', content: result.data.transcription.text },
+                        { role: 'assistant', content: result.data.aiResponse.message }
+                    );
+                    updateConversationHistory();
+                } else {
+                    showResult(result, true);
+                }
+
+            } catch (error) {
+                showResult({
+                    success: false,
+                    error: `请求失败: ${error.message}`
+                }, true);
+            } finally {
+                processBtn.disabled = false;
+                processBtn.innerHTML = originalText;
+            }
+        }
+
+        async function processContextualChat() {
+            if (!currentFile) {
+                alert('请先选择音频文件');
+                return;
+            }
+
+            const contextualBtn = document.getElementById('contextualBtn');
+            const originalText = contextualBtn.innerHTML;
+            contextualBtn.disabled = true;
+            contextualBtn.innerHTML = '<div class="loading"><div class="spinner"></div>处理中...</div>';
+
+            try {
+                const formData = new FormData();
+                formData.append('audio', currentFile);
+                formData.append('language', document.getElementById('language').value);
+                formData.append('model', document.getElementById('model').value);
+                formData.append('conversationHistory', JSON.stringify(conversationHistory));
+
+                const response = await fetch('/api/voice-chat/contextual', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResult(result, false);
+                    
+                    // 更新对话历史
+                    conversationHistory = result.data.conversationHistory;
+                    updateConversationHistory();
+                } else {
+                    showResult(result, true);
+                }
+
+            } catch (error) {
+                showResult({
+                    success: false,
+                    error: `请求失败: ${error.message}`
+                }, true);
+            } finally {
+                contextualBtn.disabled = false;
+                contextualBtn.innerHTML = originalText;
+            }
+        }
+
+        function showResult(result, isError = false) {
+            const resultDiv = document.getElementById('result');
+            
+            if (isError) {
+                resultDiv.innerHTML = `
+                    <div class="result-container error">
+                        <h3>❌ 处理失败</h3>
+                        <p><strong>错误信息：</strong>${result.error}</p>
+                        ${result.step ? `<p><strong>失败步骤：</strong>${result.step}</p>` : ''}
+                    </div>
+                `;
+            } else {
+                const data = result.data;
+                resultDiv.innerHTML = `
+                    <div class="result-container success">
+                        <h3>✅ 处理成功</h3>
+                        
+                        <div class="result-section">
+                            <h4>🎤 讯飞语音识别结果</h4>
+                            <p><strong>识别文字：</strong>"${data.transcription.text}"</p>
+                            <p><strong>置信度：</strong>${(data.transcription.confidence * 100).toFixed(1)}%</p>
+                            <p><strong>语言：</strong>${data.transcription.language}</p>
+                            <p><strong>时长：</strong>${(data.transcription.duration / 1000).toFixed(1)}秒</p>
+                        </div>
+                        
+                        <div class="result-section">
+                            <h4>🤖 Kimi AI 回复</h4>
+                            <p style="white-space: pre-wrap; line-height: 1.6;">${data.aiResponse.message}</p>
+                            <p><strong>使用模型：</strong>${data.aiResponse.model}</p>
+                            <p><strong>Token使用：</strong>输入 ${data.aiResponse.usage.prompt_tokens}, 输出 ${data.aiResponse.usage.completion_tokens}, 总计 ${data.aiResponse.usage.total_tokens}</p>
+                        </div>
+                        
+                        <div class="result-section">
+                            <h4>📊 处理信息</h4>
+                            <p><strong>工作流：</strong>${data.workflow}</p>
+                            <p><strong>处理时间：</strong>${data.processingTime}ms</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateConversationHistory() {
+            const historyDiv = document.getElementById('conversationHistory');
+            
+            if (conversationHistory.length === 0) {
+                historyDiv.innerHTML = `
+                    <div style="text-align: center; color: #718096; padding: 20px;">
+                        暂无对话历史
+                    </div>
+                `;
+                return;
+            }
+
+            let historyHtml = '';
+            for (let i = 0; i < conversationHistory.length; i++) {
+                const message = conversationHistory[i];
+                const isUser = message.role === 'user';
+                historyHtml += `
+                    <div class="message ${message.role}">
+                        <strong>${isUser ? '👤 您' : '🤖 Kimi'}：</strong>
+                        ${message.content}
+                    </div>
+                `;
+            }
+            
+            historyDiv.innerHTML = historyHtml;
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+
+        async function testIntegration() {
+            try {
+                const response = await fetch('/api/voice-chat/test-integration', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ 集成测试成功！\n\n${result.data.message}\n\n详细信息：\n讯飞API：${result.data.details.xunfei.message}\nKimi API：${result.data.details.kimi.message}`);
+                } else {
+                    alert(`❌ 集成测试失败：${result.error}`);
+                }
+            } catch (error) {
+                alert(`❌ 测试请求失败：${error.message}`);
+            }
+        }
+
+        // 页面加载时检查服务状态
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/voice-chat/status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ 讯飞语音对话服务已就绪');
+                } else {
+                    console.error('❌ 服务状态异常');
+                }
+            } catch (error) {
+                console.error('❌ 无法连接到服务器');
+            }
+        });
+    </script>
+</body>
+</html>

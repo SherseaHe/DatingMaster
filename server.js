@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 
 // 导入路由
 const chatRoutes = require('./routes/chat');
+const voiceChatRoutes = require('./routes/voiceChat');
 const { authenticateApiKey } = require('./middleware/auth');
 
 const app = express();
@@ -60,7 +61,14 @@ app.get('/api/info', (req, res) => {
         'POST /api/chat/completion': '单轮对话',
         'POST /api/chat/history': '多轮对话',
         'POST /api/chat/stream': '流式对话',
-        'GET /api/chat/models': '获取模型列表'
+        'GET /api/chat/models': '获取模型列表',
+        'POST /api/voice-chat/process': '讯飞语音对话（完整流程）',
+        'POST /api/voice-chat/contextual': '多轮讯飞语音对话',
+        'POST /api/voice-chat/stream': '流式讯飞语音对话',
+        'POST /api/voice-chat/batch': '批量讯飞语音处理',
+        'GET /api/voice-chat/status': '讯飞语音服务状态',
+        'POST /api/voice-chat/test-integration': '测试讯飞+Kimi集成',
+        'GET /api/voice-chat/xunfei-test': '测试讯飞API连接'
       }
     }
   });
@@ -68,6 +76,7 @@ app.get('/api/info', (req, res) => {
 
 // 应用认证中间件到API路由
 app.use('/api/chat', authenticateApiKey, chatRoutes);
+app.use('/api/voice-chat', authenticateApiKey, voiceChatRoutes);
 
 // 404处理
 app.use('*', (req, res) => {
