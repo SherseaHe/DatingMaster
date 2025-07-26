@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实时语音助手 - 录音转文字+Kimi AI</title>
+    <title>Dating大师 - 语音心理分析助手</title>
     <style>
         * {
             box-sizing: border-box;
@@ -369,8 +369,8 @@
 <body>
     <div class="app-container">
         <div class="header">
-            <h1>🎤 智能语音助手</h1>
-            <p>讯飞语音识别 + Kimi AI 智能对话</p>
+            <h1>💕 Dating大师</h1>
+            <p>语音心理分析 - 判断对方心里想的什么</p>
         </div>
 
         <div class="status-bar">
@@ -424,8 +424,8 @@
 
         <div class="chat-container" id="chatContainer">
             <div class="chat-message system">
-                <div class="message-header">📡 系统消息</div>
-                正在初始化语音识别服务...
+                <div class="message-header">💕 Dating大师</div>
+                正在初始化语音心理分析服务...
             </div>
         </div>
 
@@ -512,7 +512,7 @@
             ws.onopen = () => {
                 console.log('✅ WebSocket连接成功');
                 updateStatus('connected', '已连接');
-                addSystemMessage('🎉 语音识别服务连接成功！');
+                addSystemMessage('💕 Dating大师已准备就绪！开始分析对方心理吧！');
             };
 
             ws.onmessage = (event) => {
@@ -560,7 +560,7 @@
                 case 'recording_started':
                     updateRecordingState(true);
                     if (message.config?.streamMode) {
-                        addSystemMessage('🎤 开始实时录音，系统将每2秒自动识别...');
+                        addSystemMessage('🎤 开始录音，请描述对方的话语或行为...');
                     } else {
                         addSystemMessage('🎤 开始录音，松开按钮后处理...');
                     }
@@ -580,19 +580,20 @@
                     break;
 
                 case 'stream_transcription':
-                    addPartialTranscription(message.data.text);
+                    // 不显示实时识别结果，只在后台处理
+                    console.log('实时识别:', message.data.text);
                     break;
 
                 case 'transcription_result':
                     hideProcessing();
-                    addUserMessage(message.data.text);
-                    showProcessing('🤖 正在生成AI回复...');
+                    // 不显示语音转文字结果，直接等待AI回复
+                    showProcessing('💭 Dating大师正在分析对方心理...');
                     break;
 
                 case 'final_transcription':
                     clearPartialTranscription();
-                    addUserMessage(message.data.text);
-                    showProcessing('🤖 正在生成AI回复...');
+                    // 不显示语音转文字结果，直接等待AI回复
+                    showProcessing('💭 Dating大师正在分析对方心理...');
                     break;
 
                 case 'processing':
@@ -604,21 +605,16 @@
                     hideProcessing();
                     clearPartialTranscription();
                     
-                    // 如果消息中包含用户文本，先显示
-                    if (message.data.transcription?.text) {
-                        addUserMessage(message.data.transcription.text);
-                    }
-                    
-                    // 显示AI回复
+                    // 只显示AI回复，不显示用户语音转文字结果
                     if (message.data.aiResponse?.message) {
                         addAssistantMessage(message.data.aiResponse.message);
                         conversationCount++;
                         updateSessionInfo();
                     }
 
-                    // 显示统计信息
-                    if (message.type === 'stream_complete_result' && message.data.transcription?.partialResults) {
-                        addSystemMessage(`✨ 实时识别完成，共处理${message.data.transcription.partialResults.length}个片段`);
+                    // 在控制台记录识别文字（用于调试）
+                    if (message.data.transcription?.text) {
+                        console.log('用户说:', message.data.transcription.text);
                     }
                     break;
 
@@ -671,7 +667,7 @@
                 setupAudioVisualization(stream);
 
                 console.log('✅ 麦克风权限获取成功');
-                addSystemMessage('🎤 麦克风权限获取成功，可以开始录音');
+                addSystemMessage('🎤 麦克风权限获取成功，可以开始心理分析');
 
             } catch (error) {
                 console.error('❌ 获取麦克风权限失败:', error);
@@ -1018,17 +1014,17 @@
         /**
          * 添加助手消息
          */
-        function addAssistantMessage(text) {
-            const chatContainer = document.getElementById('chatContainer');
-            const message = document.createElement('div');
-            message.className = 'chat-message assistant';
-            message.innerHTML = `
-                <div class="message-header">🤖 Kimi</div>
-                ${text}
-            `;
-            chatContainer.appendChild(message);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
+                 function addAssistantMessage(text) {
+             const chatContainer = document.getElementById('chatContainer');
+             const message = document.createElement('div');
+             message.className = 'chat-message assistant';
+             message.innerHTML = `
+                 <div class="message-header">💕 Dating大师</div>
+                 ${text}
+             `;
+             chatContainer.appendChild(message);
+             chatContainer.scrollTop = chatContainer.scrollHeight;
+         }
 
         /**
          * 添加部分识别结果

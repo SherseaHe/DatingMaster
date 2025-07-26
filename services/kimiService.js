@@ -6,6 +6,12 @@ class KimiService {
       baseURL: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
       apiKey: process.env.KIMI_API_KEY
     });
+    
+    // Dating大师的system prompt
+    this.systemPrompt = {
+      role: 'system',
+      content: '你是一个dating大师，判断对方心里想的什么。请根据用户的话语，分析对方可能的心理状态、真实想法和潜在意图，并给出专业的dating建议。'
+    };
   }
 
   /**
@@ -19,6 +25,7 @@ class KimiService {
       const completion = await this.client.chat.completions.create({
         model: model,
         messages: [
+          this.systemPrompt,
           {
             role: 'user',
             content: message
@@ -57,9 +64,14 @@ class KimiService {
         throw new Error('Messages must be a non-empty array');
       }
 
+      // 确保第一条消息是system prompt
+      const messagesWithSystem = messages[0]?.role === 'system' 
+        ? messages 
+        : [this.systemPrompt, ...messages];
+
       const completion = await this.client.chat.completions.create({
         model: model,
-        messages: messages,
+        messages: messagesWithSystem,
         temperature: 0.3,
       });
 
@@ -93,9 +105,14 @@ class KimiService {
         messages = [{ role: 'user', content: messages }];
       }
 
+      // 确保第一条消息是system prompt
+      const messagesWithSystem = messages[0]?.role === 'system' 
+        ? messages 
+        : [this.systemPrompt, ...messages];
+
       const stream = await this.client.chat.completions.create({
         model: model,
-        messages: messages,
+        messages: messagesWithSystem,
         temperature: 0.3,
         stream: true,
       });
