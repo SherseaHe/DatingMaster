@@ -386,7 +386,7 @@ class RealtimeVoiceService {
 
       console.log('🤖 AI回复生成完成');
 
-      // 发送最终结果 - 只发送AI回复，不发送转录文字
+      // 发送最终结果 - 只发送AI回复，不发送任何用户相关数据
       this.sendMessage(session.ws, {
         type: 'stream_complete_result',
         data: {
@@ -395,7 +395,6 @@ class RealtimeVoiceService {
             usage: chatResult.data.usage,
             model: chatResult.data.model
           },
-          conversationHistory: session.conversationHistory,
           processingTime: Date.now() - session.startTime
         }
       });
@@ -502,7 +501,7 @@ class RealtimeVoiceService {
 
       console.log('🤖 AI回复生成完成');
 
-      // 发送最终结果 - 只发送AI回复，不发送转录文字
+      // 发送最终结果 - 只发送AI回复，不发送任何用户相关数据
       this.sendMessage(session.ws, {
         type: 'complete_result',
         data: {
@@ -511,7 +510,6 @@ class RealtimeVoiceService {
             usage: chatResult.data.usage,
             model: chatResult.data.model
           },
-          conversationHistory: session.conversationHistory,
           processingTime: Date.now() - session.startTime
         }
       });
