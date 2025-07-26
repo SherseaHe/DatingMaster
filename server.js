@@ -3,14 +3,23 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const http = require('http');
 
 // 导入路由
 const chatRoutes = require('./routes/chat');
 const voiceChatRoutes = require('./routes/voiceChat');
 const { authenticateApiKey } = require('./middleware/auth');
 
+// 导入实时语音服务
+const RealtimeVoiceService = require('./services/realtimeVoiceService');
+
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// 创建实时语音服务
+const realtimeVoiceService = new RealtimeVoiceService();
+const wss = realtimeVoiceService.createWebSocketServer(server);
 
 // 安全中间件
 app.use(helmet());
@@ -68,7 +77,8 @@ app.get('/api/info', (req, res) => {
         'POST /api/voice-chat/batch': '批量讯飞语音处理',
         'GET /api/voice-chat/status': '讯飞语音服务状态',
         'POST /api/voice-chat/test-integration': '测试讯飞+Kimi集成',
-        'GET /api/voice-chat/xunfei-test': '测试讯飞API连接'
+        'GET /api/voice-chat/xunfei-test': '测试讯飞API连接',
+        'WebSocket /api/realtime-voice': '实时录音语音识别+AI对话'
       }
     }
   });
@@ -96,10 +106,11 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Kimi API Backend server is running on port ${PORT}`);
   console.log(`📖 API Documentation available at: http://localhost:${PORT}/api/info`);
   console.log(`💚 Health check available at: http://localhost:${PORT}/health`);
+  console.log(`🎤 Realtime Voice WebSocket available at: ws://localhost:${PORT}/api/realtime-voice`);
   
   if (process.env.NODE_ENV === 'development') {
     console.log('🔧 Running in development mode');
