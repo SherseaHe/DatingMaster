@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Love Lens · 实时转录</title>
+<style>
+  :root{
+    --bg:#000;
+    --glass:rgba(255,255,255,.08);
+    --border:rgba(255,255,255,.15);
+    --accent:#ff2d8e;
+    --text:#fff;
+    --green:#30ff88;
+    --red:#ff304f;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;}
+  body,html{height:100%;overflow:hidden;background:var(--bg);color:var(--text);}
+  #video{position:absolute;width:100%;height:100%;object-fit:cover;z-index:0;}
+  .overlay{position:relative;z-index:1;width:100%;height:calc(100% - 60px);display:flex;justify-content:space-between;padding:1rem;pointer-events:none;}
+  /* 统一卡片高度 100px，内容完全居中 */
+  .card{
+    background:var(--glass);border:1px solid var(--border);backdrop-filter:blur(12px) saturate(160%);
+    border-radius:10px;padding:.3rem;font-size:.65rem;color:var(--text);
+    width:120px;height:100px;display:flex;flex-direction:column;
+    justify-content:center;align-items:center;text-align:center;
+    pointer-events:auto;
+  }
+  .card h4{margin-bottom:.2rem;font-size:.7rem;color:var(--accent);}
+  ul{list-style:none;padding:0;}
+  li{margin:.05rem 0;line-height:1.2;}
+  .todo li{cursor:pointer;user-select:none;}
+  .todo li:before{content:"○";margin-right:.2rem;font-size:.6rem;}
+  .todo li.done:before{content:"✓";color:var(--green);}
+  .center-top{position:absolute;top:1rem;left:50%;transform:translateX(-50%);width:180px;height:100px;display:flex;flex-direction:column;justify-content:center;align-items:center;}
+  #realtime{color:#ccc;font-style:italic;}
+  #affinity{font-size:1.2rem;font-weight:bold;color:var(--green);margin-top:.3rem;transition:transform .2s;}
+  .pop{transform:scale(1.3);}
+  .footer{position:absolute;bottom:0;width:100%;height:60px;display:flex;justify-content:center;align-items:center;gap:.6rem;pointer-events:auto;}
+  .btn{background:var(--accent);border:none;color:#fff;padding:.5rem 1rem;border-radius:99px;font-size:.7rem;cursor:pointer;transition:background .2s;}
+  .btn:active{background:#c7005d;}
+  #stopBtn{background:#666;}
+</style>
+</head>
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+
+<div class="overlay">
+  <!-- 左上 -->
+  <div class="card">
+    <h4>个人信息</h4>
+    <ul>
+      <li>林星澜</li><li>天蝎</li><li>潜水·胶片</li>
+    </ul>
+  </div>
+
+  <!-- 中上 -->
+  <div class="center-top card">
+    <h4>实时对话</h4>
+    <ul id="dialog">
+      <li>她：计划去薄荷岛</li>
+      <li><span id="realtime">（等待说话…）</span></li>
+    </ul>
+    <div id="affinity">好感度：--</div>
+  </div>
+
+  <!-- 右上 -->
+  <div class="card todo">
+    <h4>谈话目标</h4>
+    <ul>
+      <li onclick="this.classList.toggle('done')">约周末咖啡</li>
+      <li onclick="this.classList.toggle('done')">聊潜水行程</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  <button id="startBtn" class="btn">按住说话</button>
+  <button id="stopBtn" class="btn" style="display:none;">停止说话</button>
+</div>
+
+<script>
+/* 摄像头 */
+navigator.mediaDevices.getUserMedia({video:true})
+  .then(s=>video.srcObject=s).catch(()=>{});
+
+/* 好感度：60-95 随机，每次 |Δ| < 10 */
+const affinityEl = document.getElementById('affinity');
+let prev = 77;               // 初始值
+function updateAffinity(){
+  const delta = Math.floor(Math.random()*19)-9;  // -9~+9
+  let next = prev + delta;
+  if(next<60) next = 60 + Math.abs(delta);
+  if(next>95) next = 95 - Math.abs(delta);
+  prev = next;
+  affinityEl.textContent = `好感度：${next}`;
+}
+updateAffinity();
+setInterval(updateAffinity,2000);
+
+/* 语音转录保持原逻辑 */
+const realtimeEl = document.getElementById('realtime');
+const startBtn   = document.getElementById('startBtn');
+const stopBtn    = document.getElementById('stopBtn');
+
+if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)){
+  startBtn.textContent='浏览器不支持';startBtn.disabled=true;
+}else{
+  const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new Speech(); rec.lang='zh-CN'; rec.continuous=true; rec.interimResults=true;
+  let finalTranscript='';
+  rec.onstart=()=>{startBtn.style.display='none';stopBtn.style.display='inline-block';realtimeEl.textContent='（聆听中…）';};
+  rec.onend=()=>{startBtn.style.display='inline-block';stopBtn.style.display='none';if(finalTranscript){realtimeEl.textContent=`你：${finalTranscript}`;}};
+  rec.onresult=(e)=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;++i){
+      const r=e.results[i]; r.isFinal?finalTranscript+=r[0].transcript:interim+=r[0].transcript;
+    }
+    realtimeEl.textContent=interim||finalTranscript||'（等待说话…）';
+  };
+  startBtn.onmousedown=()=>{finalTranscript='';rec.start();};
+  stopBtn.onclick=()=>rec.stop();
+  startBtn.ontouchstart=e=>{e.preventDefault();finalTranscript='';rec.start();};
+  stopBtn.ontouchend=e=>{e.preventDefault();rec.stop();};
+}
+</script>
+</body>
+</html>
