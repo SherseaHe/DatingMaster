@@ -343,9 +343,16 @@
 
         // 初始化WebSocket连接
         function initializeWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/api/realtime-voice`;
+            // 检测是否是本地文件，如果是则使用localhost:3000
+            let wsUrl;
+            if (window.location.protocol === 'file:') {
+                wsUrl = 'ws://localhost:3000/api/realtime-voice';
+            } else {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = `${protocol}//${window.location.host}/api/realtime-voice`;
+            }
             
+            console.log('正在连接到:', wsUrl);
             updateStatus('connecting', '连接中...');
             
             ws = new WebSocket(wsUrl);
