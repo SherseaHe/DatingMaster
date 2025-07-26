@@ -32,10 +32,16 @@ class RealtimeVoiceService {
         ws: ws,
         audioBuffer: Buffer.alloc(0),
         isRecording: false,
+        isStreamMode: false,
+        streamBuffer: Buffer.alloc(0),
+        lastProcessTime: 0,
+        partialResults: [],
         conversationHistory: [],
         language: 'zh_cn',
         model: 'moonshot-v1-8k',
-        startTime: Date.now()
+        startTime: Date.now(),
+        xunfeiConnection: null,
+        streamInterval: null
       };
 
       this.activeSessions.set(sessionId, session);
@@ -111,6 +117,10 @@ class RealtimeVoiceService {
         await this.stopRecording(sessionId);
         break;
       
+      case 'toggle_recording':
+        await this.toggleRecording(sessionId, message);
+        break;
+      
       case 'config':
         this.updateConfig(sessionId, message);
         break;
@@ -134,21 +144,131 @@ class RealtimeVoiceService {
     if (!session) return;
 
     session.isRecording = true;
+    session.isStreamMode = config.streamMode || false;
     session.audioBuffer = Buffer.alloc(0);
+    session.streamBuffer = Buffer.alloc(0);
+    session.lastProcessTime = Date.now();
+    session.partialResults = [];
     session.language = config.language || 'zh_cn';
     session.model = config.model || 'moonshot-v1-8k';
     session.startTime = Date.now();
 
     this.sendMessage(session.ws, {
       type: 'recording_started',
-      message: '开始录音',
+      message: session.isStreamMode ? '开始实时录音' : '开始录音',
       config: {
         language: session.language,
-        model: session.model
+        model: session.model,
+        streamMode: session.isStreamMode
       }
     });
 
-    console.log(`🎤 开始录音: ${sessionId}`);
+    // 如果是流式模式，启动实时处理
+    if (session.isStreamMode) {
+      await this.startStreamProcessing(sessionId);
+    }
+
+    console.log(`🎤 开始${session.isStreamMode ? '实时' : ''}录音: ${sessionId}`);
+  }
+
+  /**
+   * 切换录音状态
+   * @param {string} sessionId - 会话ID
+   * @param {Object} config - 配置参数
+   */
+  async toggleRecording(sessionId, config = {}) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return;
+
+    if (session.isRecording) {
+      // 当前正在录音，停止录音
+      await this.stopRecording(sessionId);
+    } else {
+      // 当前未录音，开始录音
+      config.streamMode = true; // 切换模式默认开启流式处理
+      await this.startRecording(sessionId, config);
+    }
+  }
+
+  /**
+   * 开始实时流式处理
+   * @param {string} sessionId - 会话ID
+   */
+  async startStreamProcessing(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return;
+
+    // 设置定时器，每2秒处理一次累积的音频
+    session.streamInterval = setInterval(async () => {
+      await this.processStreamAudio(sessionId);
+    }, 2000);
+
+    console.log(`🌊 开始实时流式处理: ${sessionId}`);
+  }
+
+  /**
+   * 处理流式音频片段
+   * @param {string} sessionId - 会话ID
+   */
+  async processStreamAudio(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session || !session.isRecording || !session.isStreamMode) return;
+
+    // 检查是否有足够的音频数据（至少1秒的音频）
+    const minAudioSize = 16000 * 2; // 16kHz * 2字节 * 1秒
+    if (session.streamBuffer.length < minAudioSize) return;
+
+    try {
+      // 发送处理状态
+      this.sendMessage(session.ws, {
+        type: 'stream_processing',
+        message: '实时处理中...',
+        audioSize: session.streamBuffer.length
+      });
+
+      // 转换音频为WAV格式
+      const audioBuffer = this.convertToWav(session.streamBuffer);
+      
+      // 调用讯飞识别
+      const transcriptionResult = await this.xunfeiService.transcribe(audioBuffer, {
+        language: session.language
+      });
+
+      if (transcriptionResult.success && transcriptionResult.text.trim()) {
+        const transcribedText = transcriptionResult.text.trim();
+        
+        // 发送实时识别结果
+        this.sendMessage(session.ws, {
+          type: 'stream_transcription',
+          data: {
+            text: transcribedText,
+            confidence: transcriptionResult.confidence,
+            isPartial: true,
+            timestamp: Date.now()
+          }
+        });
+
+        // 保存部分结果
+        session.partialResults.push({
+          text: transcribedText,
+          timestamp: Date.now(),
+          confidence: transcriptionResult.confidence
+        });
+
+        console.log(`📝 实时识别: "${transcribedText}"`);
+      }
+
+      // 清空已处理的流式缓冲区
+      session.streamBuffer = Buffer.alloc(0);
+      session.lastProcessTime = Date.now();
+
+    } catch (error) {
+      console.error('实时流式处理失败:', error);
+      this.sendMessage(session.ws, {
+        type: 'stream_error',
+        error: '实时处理失败: ' + error.message
+      });
+    }
   }
 
   /**
@@ -161,18 +281,137 @@ class RealtimeVoiceService {
 
     session.isRecording = false;
 
+    // 停止流式处理定时器
+    if (session.streamInterval) {
+      clearInterval(session.streamInterval);
+      session.streamInterval = null;
+    }
+
     this.sendMessage(session.ws, {
       type: 'recording_stopped',
-      message: '录音结束，处理中...'
+      message: session.isStreamMode ? '实时录音结束，生成最终回复...' : '录音结束，处理中...',
+      streamMode: session.isStreamMode
     });
 
-    console.log(`🛑 停止录音: ${sessionId}, 音频大小: ${session.audioBuffer.length} 字节`);
+    console.log(`🛑 停止${session.isStreamMode ? '实时' : ''}录音: ${sessionId}, 音频大小: ${session.audioBuffer.length} 字节`);
 
     // 处理录音数据
-    if (session.audioBuffer.length > 0) {
+    if (session.isStreamMode) {
+      await this.processFinalStreamResult(sessionId);
+    } else if (session.audioBuffer.length > 0) {
       await this.processRecordedAudio(sessionId);
     } else {
       this.sendError(session.ws, '录音数据为空');
+    }
+  }
+
+  /**
+   * 处理流式模式的最终结果
+   * @param {string} sessionId - 会话ID
+   */
+  async processFinalStreamResult(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return;
+
+    try {
+      // 合并所有部分识别结果
+      let finalText = '';
+      if (session.partialResults.length > 0) {
+        // 取最后几个结果，去重并合并
+        const recentResults = session.partialResults.slice(-3);
+        const uniqueTexts = [...new Set(recentResults.map(r => r.text))];
+        finalText = uniqueTexts.join(' ');
+      }
+
+      // 如果没有流式结果，处理最后的音频缓冲区
+      if (!finalText && session.audioBuffer.length > 0) {
+        this.sendMessage(session.ws, {
+          type: 'processing',
+          step: 'final_transcription',
+          message: '处理最终音频...'
+        });
+
+        const audioBuffer = this.convertToWav(session.audioBuffer);
+        const transcriptionResult = await this.xunfeiService.transcribe(audioBuffer, {
+          language: session.language
+        });
+
+        if (transcriptionResult.success) {
+          finalText = transcriptionResult.text;
+        }
+      }
+
+      if (!finalText || !finalText.trim()) {
+        this.sendError(session.ws, '未识别到有效语音内容');
+        return;
+      }
+
+      finalText = finalText.trim();
+      console.log(`📝 最终识别结果: "${finalText}"`);
+
+      // 发送最终识别结果
+      this.sendMessage(session.ws, {
+        type: 'final_transcription',
+        data: {
+          text: finalText,
+          partialCount: session.partialResults.length,
+          totalDuration: Date.now() - session.startTime
+        }
+      });
+
+      // 第2步：Kimi AI处理
+      this.sendMessage(session.ws, {
+        type: 'processing',
+        step: 'ai_response',
+        message: '正在生成AI回复...'
+      });
+
+      // 构建对话历史
+      const messages = [
+        ...session.conversationHistory,
+        { role: 'user', content: finalText }
+      ];
+
+      const chatResult = await this.kimiService.chatWithHistory(messages, session.model);
+
+      if (!chatResult.success) {
+        throw new Error('AI对话失败: ' + chatResult.error);
+      }
+
+      // 更新对话历史
+      session.conversationHistory = [
+        ...messages,
+        { role: 'assistant', content: chatResult.data.message }
+      ];
+
+      console.log('🤖 AI回复生成完成');
+
+      // 发送最终结果
+      this.sendMessage(session.ws, {
+        type: 'stream_complete_result',
+        data: {
+          transcription: {
+            text: finalText,
+            partialResults: session.partialResults,
+            totalDuration: Date.now() - session.startTime
+          },
+          aiResponse: {
+            message: chatResult.data.message,
+            usage: chatResult.data.usage,
+            model: chatResult.data.model
+          },
+          conversationHistory: session.conversationHistory,
+          processingTime: Date.now() - session.startTime
+        }
+      });
+
+      // 清理流式数据
+      session.partialResults = [];
+      session.streamBuffer = Buffer.alloc(0);
+
+    } catch (error) {
+      console.error('处理流式最终结果失败:', error);
+      this.sendError(session.ws, error.message);
     }
   }
 
@@ -188,11 +427,17 @@ class RealtimeVoiceService {
     // 累积音频数据
     session.audioBuffer = Buffer.concat([session.audioBuffer, audioData]);
 
+    // 如果是流式模式，也累积到流式缓冲区
+    if (session.isStreamMode) {
+      session.streamBuffer = Buffer.concat([session.streamBuffer, audioData]);
+    }
+
     // 发送录音状态更新
     this.sendMessage(session.ws, {
       type: 'recording_progress',
       audioSize: session.audioBuffer.length,
-      duration: Date.now() - session.startTime
+      duration: Date.now() - session.startTime,
+      streamMode: session.isStreamMode
     });
   }
 

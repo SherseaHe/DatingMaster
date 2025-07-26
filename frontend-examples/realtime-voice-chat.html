@@ -291,9 +291,15 @@
         </div>
 
         <div class="record-section">
-            <div>按住录音，松开处理</div>
+            <div id="recordModeText">点击录音，实时识别</div>
             <button class="record-button" id="recordButton">🎤</button>
             <div id="recordingStatus">点击开始录音</div>
+            
+            <div style="margin-top: 15px;">
+                <label>
+                    <input type="checkbox" id="streamMode" checked> 实时流式识别
+                </label>
+            </div>
             
             <div class="audio-visualizer" id="audioVisualizer" style="display: none;">
                 <!-- 音频可视化条 -->
@@ -412,6 +418,33 @@
                     updateSessionInfo(sessionId, message.data.conversationHistory.length);
                     break;
                     
+                case 'stream_processing':
+                    showProcessing(message.message);
+                    break;
+                    
+                case 'stream_transcription':
+                    addPartialTranscription(message.data.text);
+                    break;
+                    
+                case 'final_transcription':
+                    clearPartialTranscription();
+                    addUserMessage(message.data.text);
+                    break;
+                    
+                case 'stream_complete_result':
+                    hideProcessing();
+                    clearPartialTranscription();
+                    addUserMessage(message.data.transcription.text);
+                    addAssistantMessage(message.data.aiResponse.message);
+                    updateSessionInfo(sessionId, message.data.conversationHistory.length);
+                    addSystemMessage(`实时识别完成，共${message.data.transcription.partialResults.length}个片段`);
+                    break;
+                    
+                case 'stream_error':
+                    hideProcessing();
+                    addSystemMessage(`流式处理错误: ${message.error}`);
+                    break;
+                    
                 case 'error':
                     hideProcessing();
                     addSystemMessage(`错误: ${message.error}`);
@@ -427,20 +460,72 @@
         // 设置录音按钮
         function setupRecordButton() {
             const recordButton = document.getElementById('recordButton');
+            const streamModeCheckbox = document.getElementById('streamMode');
             
-            // 鼠标事件
-            recordButton.addEventListener('mousedown', startRecording);
-            recordButton.addEventListener('mouseup', stopRecording);
-            recordButton.addEventListener('mouseleave', stopRecording);
+            // 更新模式文本
+            function updateModeText() {
+                const modeText = document.getElementById('recordModeText');
+                const statusText = document.getElementById('recordingStatus');
+                
+                if (streamModeCheckbox.checked) {
+                    modeText.textContent = '点击录音，实时识别';
+                    if (!isRecording) {
+                        statusText.textContent = '点击开始实时录音';
+                    }
+                } else {
+                    modeText.textContent = '按住录音，松开处理';
+                    if (!isRecording) {
+                        statusText.textContent = '按住开始录音';
+                    }
+                }
+            }
+            
+            streamModeCheckbox.addEventListener('change', updateModeText);
+            updateModeText();
+            
+            // 统一的点击/触摸处理
+            recordButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (streamModeCheckbox.checked) {
+                    // 流式模式：点击切换
+                    toggleRecording();
+                }
+            });
+            
+            // 按住模式事件（非流式模式）
+            recordButton.addEventListener('mousedown', (e) => {
+                if (!streamModeCheckbox.checked) {
+                    startRecording();
+                }
+            });
+            
+            recordButton.addEventListener('mouseup', (e) => {
+                if (!streamModeCheckbox.checked) {
+                    stopRecording();
+                }
+            });
+            
+            recordButton.addEventListener('mouseleave', (e) => {
+                if (!streamModeCheckbox.checked && isRecording) {
+                    stopRecording();
+                }
+            });
             
             // 触摸事件（移动设备）
             recordButton.addEventListener('touchstart', (e) => {
                 e.preventDefault();
-                startRecording();
+                if (streamModeCheckbox.checked) {
+                    toggleRecording();
+                } else {
+                    startRecording();
+                }
             });
+            
             recordButton.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                stopRecording();
+                if (!streamModeCheckbox.checked && isRecording) {
+                    stopRecording();
+                }
             });
         }
 
@@ -513,7 +598,52 @@
             updateVisualization();
         }
 
-        // 开始录音
+        // 切换录音状态
+        function toggleRecording() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('WebSocket未连接，无法开始录音');
+                return;
+            }
+            
+            if (!mediaRecorder) {
+                addSystemMessage('媒体录音器未初始化');
+                return;
+            }
+
+            if (isRecording) {
+                // 当前正在录音，停止录音
+                stopRecording();
+            } else {
+                // 当前未录音，开始录音
+                startStreamRecording();
+            }
+        }
+
+        // 开始流式录音
+        function startStreamRecording() {
+            isRecording = true;
+            updateStatus('recording', '实时录音中...');
+            
+            const recordButton = document.getElementById('recordButton');
+            recordButton.classList.add('recording');
+            recordButton.textContent = '⏹️';
+            
+            document.getElementById('recordingStatus').textContent = '实时录音中... 再次点击结束';
+            document.getElementById('audioVisualizer').style.display = 'flex';
+            
+            // 发送开始录音消息（流式模式）
+            ws.send(JSON.stringify({
+                type: 'toggle_recording',
+                language: document.getElementById('language').value,
+                model: document.getElementById('model').value,
+                streamMode: true
+            }));
+            
+            // 开始录音
+            mediaRecorder.start(100); // 每100ms发送一次数据
+        }
+
+        // 开始录音（传统模式）
         function startRecording() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addSystemMessage('WebSocket未连接，无法开始录音');
@@ -539,7 +669,8 @@
             ws.send(JSON.stringify({
                 type: 'start_recording',
                 language: document.getElementById('language').value,
-                model: document.getElementById('model').value
+                model: document.getElementById('model').value,
+                streamMode: false
             }));
             
             // 开始录音
@@ -655,6 +786,34 @@
         function clearChatContainer() {
             const chatContainer = document.getElementById('chatContainer');
             chatContainer.innerHTML = '';
+        }
+
+        // 添加部分识别结果
+        function addPartialTranscription(text) {
+            const chatContainer = document.getElementById('chatContainer');
+            
+            // 查找或创建部分结果元素
+            let partialElement = document.getElementById('partialTranscription');
+            if (!partialElement) {
+                partialElement = document.createElement('div');
+                partialElement.id = 'partialTranscription';
+                partialElement.className = 'message user partial';
+                partialElement.style.opacity = '0.7';
+                partialElement.style.fontStyle = 'italic';
+                partialElement.style.border = '2px dashed #667eea';
+                chatContainer.appendChild(partialElement);
+            }
+            
+            partialElement.innerHTML = `<strong>👤 您 (实时):</strong> ${text}`;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 清除部分识别结果
+        function clearPartialTranscription() {
+            const partialElement = document.getElementById('partialTranscription');
+            if (partialElement) {
+                partialElement.remove();
+            }
         }
 
         // 切换连接

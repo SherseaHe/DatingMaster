@@ -71,7 +71,18 @@ ws.send(JSON.stringify({
 {
     "type": "start_recording",
     "language": "zh_cn",
-    "model": "moonshot-v1-8k"
+    "model": "moonshot-v1-8k",
+    "streamMode": false
+}
+```
+
+#### **切换录音状态（实时模式）**
+```json
+{
+    "type": "toggle_recording",
+    "language": "zh_cn",
+    "model": "moonshot-v1-8k",
+    "streamMode": true
 }
 ```
 
@@ -153,7 +164,32 @@ ws.send(JSON.stringify({
 }
 ```
 
-#### **完整结果**
+#### **实时识别结果**
+```json
+{
+    "type": "stream_transcription",
+    "data": {
+        "text": "部分识别内容",
+        "confidence": 0.85,
+        "isPartial": true,
+        "timestamp": 1704067200000
+    }
+}
+```
+
+#### **最终识别结果**
+```json
+{
+    "type": "final_transcription",
+    "data": {
+        "text": "完整识别内容",
+        "partialCount": 3,
+        "totalDuration": 5000
+    }
+}
+```
+
+#### **完整结果（传统模式）**
 ```json
 {
     "type": "complete_result",
@@ -178,6 +214,30 @@ ws.send(JSON.stringify({
             {"role": "assistant", "content": "Kimi的智能回复"}
         ],
         "processingTime": 3500
+    }
+}
+```
+
+#### **流式完整结果**
+```json
+{
+    "type": "stream_complete_result",
+    "data": {
+        "transcription": {
+            "text": "最终合并的识别内容",
+            "partialResults": [
+                {"text": "部分1", "timestamp": 1704067200000},
+                {"text": "部分2", "timestamp": 1704067202000}
+            ],
+            "totalDuration": 5000
+        },
+        "aiResponse": {
+            "message": "Kimi的智能回复",
+            "usage": {...},
+            "model": "moonshot-v1-8k"
+        },
+        "conversationHistory": [...],
+        "processingTime": 5500
     }
 }
 ```
@@ -253,6 +313,8 @@ const VoiceChat = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [status, setStatus] = useState('disconnected');
     const [messages, setMessages] = useState([]);
+    const [currentTranscription, setCurrentTranscription] = useState('');
+    const [streamMode, setStreamMode] = useState(true);
     const mediaRecorderRef = useRef(null);
 
     useEffect(() => {
@@ -281,11 +343,20 @@ const VoiceChat = () => {
     const handleMessage = (message) => {
         switch (message.type) {
             case 'complete_result':
+            case 'stream_complete_result':
                 setMessages(prev => [
                     ...prev,
                     { type: 'user', content: message.data.transcription.text },
                     { type: 'assistant', content: message.data.aiResponse.message }
                 ]);
+                break;
+            case 'stream_transcription':
+                // 显示实时识别结果
+                setCurrentTranscription(message.data.text);
+                break;
+            case 'final_transcription':
+                // 清除实时识别，显示最终结果
+                setCurrentTranscription('');
                 break;
             case 'error':
                 console.error('语音识别错误:', message.error);
@@ -293,53 +364,68 @@ const VoiceChat = () => {
         }
     };
 
-    const startRecording = async () => {
+    const toggleRecording = async () => {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
+        if (isRecording) {
+            // 停止录音
+            if (mediaRecorderRef.current) {
+                mediaRecorderRef.current.stop();
+            }
+            
+            if (streamMode) {
+                ws.send(JSON.stringify({ type: 'toggle_recording' }));
+            } else {
+                ws.send(JSON.stringify({ type: 'stop_recording' }));
+            }
+            
+            setIsRecording(false);
+        } else {
+            // 开始录音
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorderRef.current = mediaRecorder;
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    ws.send(event.data);
-                }
-            };
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        ws.send(event.data);
+                    }
+                };
 
-            // 发送开始录音消息
-            ws.send(JSON.stringify({
-                type: 'start_recording',
-                language: 'zh_cn',
-                model: 'moonshot-v1-8k'
-            }));
+                // 发送开始录音消息
+                ws.send(JSON.stringify({
+                    type: streamMode ? 'toggle_recording' : 'start_recording',
+                    language: 'zh_cn',
+                    model: 'moonshot-v1-8k',
+                    streamMode: streamMode
+                }));
 
-            mediaRecorder.start(100);
-            setIsRecording(true);
-        } catch (error) {
-            console.error('开始录音失败:', error);
+                mediaRecorder.start(100);
+                setIsRecording(true);
+            } catch (error) {
+                console.error('开始录音失败:', error);
+            }
         }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current) {
-            mediaRecorderRef.current.stop();
-        }
-        
-        if (ws) {
-            ws.send(JSON.stringify({ type: 'stop_recording' }));
-        }
-        
-        setIsRecording(false);
     };
 
     return (
         <div>
             <div>状态: {status}</div>
             
+            <div>
+                <label>
+                    <input 
+                        type="checkbox" 
+                        checked={streamMode} 
+                        onChange={(e) => setStreamMode(e.target.checked)} 
+                    />
+                    实时流式识别
+                </label>
+            </div>
+            
             <button
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
+                onClick={toggleRecording}
                 disabled={status !== 'connected'}
                 style={{
                     backgroundColor: isRecording ? 'red' : 'green',
@@ -351,10 +437,25 @@ const VoiceChat = () => {
                     fontSize: '24px'
                 }}
             >
-                {isRecording ? '🔴' : '🎤'}
+                {isRecording ? (streamMode ? '⏹️' : '🔴') : '🎤'}
             </button>
+            
+            <div>{streamMode ? '点击录音，实时识别' : '按住录音，松开处理'}</div>
 
             <div>
+                {currentTranscription && (
+                    <div style={{
+                        padding: '10px',
+                        margin: '5px',
+                        backgroundColor: '#fff3cd',
+                        borderRadius: '8px',
+                        fontStyle: 'italic',
+                        border: '2px dashed #ffc107'
+                    }}>
+                        <strong>👤 您 (实时):</strong> {currentTranscription}
+                    </div>
+                )}
+                
                 {messages.map((msg, index) => (
                     <div key={index} style={{
                         padding: '10px',
