@@ -13,11 +13,16 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB 限制
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/flac', 'audio/ogg', 'audio/webm'];
-    if (allowedTypes.includes(file.mimetype)) {
+    // 更宽松的文件类型检测，包括无MIME类型的情况
+    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/flac', 'audio/ogg', 'audio/webm', 'audio/wave', 'audio/x-wav'];
+    const fileName = file.originalname.toLowerCase();
+    const hasAudioExt = fileName.endsWith('.wav') || fileName.endsWith('.mp3') || fileName.endsWith('.m4a') || fileName.endsWith('.flac') || fileName.endsWith('.ogg');
+    
+    if (allowedTypes.includes(file.mimetype) || hasAudioExt || file.mimetype === 'application/octet-stream') {
       cb(null, true);
     } else {
-      cb(new Error('不支持的音频格式'), false);
+      console.log(`文件类型检测: ${file.mimetype}, 文件名: ${file.originalname}`);
+      cb(new Error(`不支持的音频格式: ${file.mimetype}`), false);
     }
   }
 });
