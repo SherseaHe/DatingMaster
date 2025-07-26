@@ -150,13 +150,13 @@ router.post('/stream', upload.single('audio'), async (req, res) => {
       model: model || 'moonshot-v1-8k',
       language: language || 'zh_cn',
       
-      // 讯飞语音识别完成回调
-      onTranscription: (transcription) => {
-        res.write(`data: ${JSON.stringify({
-          type: 'transcription',
-          data: transcription
-        })}\n\n`);
-      },
+      // 不发送讯飞语音识别结果到前端
+      // onTranscription: (transcription) => {
+      //   res.write(`data: ${JSON.stringify({
+      //     type: 'transcription',
+      //     data: transcription
+      //   })}\n\n`);
+      // },
       
       // Kimi AI回复片段回调
       onAIResponse: (content) => {
