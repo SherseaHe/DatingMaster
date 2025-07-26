@@ -237,16 +237,16 @@ class RealtimeVoiceService {
       if (transcriptionResult.success && transcriptionResult.text.trim()) {
         const transcribedText = transcriptionResult.text.trim();
         
-        // 发送实时识别结果
-        this.sendMessage(session.ws, {
-          type: 'stream_transcription',
-          data: {
-            text: transcribedText,
-            confidence: transcriptionResult.confidence,
-            isPartial: true,
-            timestamp: Date.now()
-          }
-        });
+        // 不发送实时识别结果到前端，只记录在后端
+        // this.sendMessage(session.ws, {
+        //   type: 'stream_transcription',
+        //   data: {
+        //     text: transcribedText,
+        //     confidence: transcriptionResult.confidence,
+        //     isPartial: true,
+        //     timestamp: Date.now()
+        //   }
+        // });
 
         // 保存部分结果
         session.partialResults.push({
@@ -349,15 +349,15 @@ class RealtimeVoiceService {
       finalText = finalText.trim();
       console.log(`📝 最终识别结果: "${finalText}"`);
 
-      // 发送最终识别结果
-      this.sendMessage(session.ws, {
-        type: 'final_transcription',
-        data: {
-          text: finalText,
-          partialCount: session.partialResults.length,
-          totalDuration: Date.now() - session.startTime
-        }
-      });
+      // 不发送最终识别结果到前端，只记录在后端
+      // this.sendMessage(session.ws, {
+      //   type: 'final_transcription',
+      //   data: {
+      //     text: finalText,
+      //     partialCount: session.partialResults.length,
+      //     totalDuration: Date.now() - session.startTime
+      //   }
+      // });
 
       // 第2步：Kimi AI处理
       this.sendMessage(session.ws, {
@@ -469,16 +469,16 @@ class RealtimeVoiceService {
       const transcribedText = transcriptionResult.text;
       console.log(`📝 识别结果: "${transcribedText}"`);
 
-      // 发送识别结果
-      this.sendMessage(session.ws, {
-        type: 'transcription_result',
-        data: {
-          text: transcribedText,
-          confidence: transcriptionResult.confidence,
-          language: transcriptionResult.language,
-          duration: transcriptionResult.duration
-        }
-      });
+      // 不发送识别结果到前端，只记录在后端
+      // this.sendMessage(session.ws, {
+      //   type: 'transcription_result',
+      //   data: {
+      //     text: transcribedText,
+      //     confidence: transcriptionResult.confidence,
+      //     language: transcriptionResult.language,
+      //     duration: transcriptionResult.duration
+      //   }
+      // });
 
       // 第2步：Kimi AI处理
       this.sendMessage(session.ws, {
