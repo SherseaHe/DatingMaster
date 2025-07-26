@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时语音助手 - 录音转文字+Kimi AI</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border-left: 5px solid #48bb78;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e53e3e;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.connected { background: #48bb78; animation: pulse 2s infinite; }
+        .status-dot.recording { background: #e53e3e; animation: recordPulse 1s infinite; }
+        .status-dot.processing { background: #d69e2e; animation: spin 1s linear infinite; }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(72, 187, 120, 0); }
+        }
+
+        @keyframes recordPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.7); }
+            50% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(229, 62, 62, 0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .control-panel {
+            text-align: center;
+            background: #f7fafc;
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+        }
+
+        .record-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            font-size: 40px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
+        }
+
+        .record-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(72, 187, 120, 0.4);
+        }
+
+        .record-button.recording {
+            background: linear-gradient(135deg, #e53e3e, #c53030);
+            animation: recordPulse 1s ease-in-out infinite;
+        }
+
+        .record-button.processing {
+            background: linear-gradient(135deg, #d69e2e, #b7791f);
+            cursor: not-allowed;
+        }
+
+        .control-text {
+            font-size: 1.2em;
+            color: #4a5568;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        .settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .setting-group {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .setting-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .setting-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .chat-message {
+            margin: 15px 0;
+            padding: 15px 20px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, #ebf4ff, #bee3f8);
+            margin-left: auto;
+            text-align: right;
+            border-bottom-right-radius: 5px;
+        }
+
+        .chat-message.assistant {
+            background: linear-gradient(135deg, #f0fff4, #c6f6d5);
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+
+        .chat-message.system {
+            background: linear-gradient(135deg, #faf5ff, #e9d8fd);
+            text-align: center;
+            font-style: italic;
+            max-width: 100%;
+            font-size: 0.9em;
+        }
+
+        .chat-message.partial {
+            background: linear-gradient(135deg, #fff5f5, #fed7d7);
+            border: 2px dashed #fc8181;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .message-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .processing-indicator {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #fff5f5, #fed7d7);
+            border-radius: 15px;
+            margin: 15px 0;
+            border: 2px solid #fc8181;
+        }
+
+        .processing-indicator.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fed7d7;
+            border-top: 2px solid #e53e3e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .audio-visualizer {
+            height: 60px;
+            background: linear-gradient(135deg, #f7fafc, #edf2f7);
+            border-radius: 15px;
+            margin: 20px 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            border: 2px dashed #cbd5e0;
+        }
+
+        .audio-bar {
+            width: 4px;
+            height: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0 2px;
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #e2e8f0, #cbd5e0);
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #cbd5e0, #a0aec0);
+            transform: translateY(-2px);
+        }
+
+        .connection-info {
+            font-size: 0.9em;
+            color: #718096;
+        }
+
+        .mode-toggle {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .mode-toggle label {
+            font-weight: 600;
+            color: #4a5568;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .mode-toggle input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .settings {
+                grid-template-columns: 1fr;
+            }
+
+            .record-button {
+                width: 100px;
+                height: 100px;
+                font-size: 35px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🎤 智能语音助手</h1>
+            <p>讯飞语音识别 + Kimi AI 智能对话</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">正在连接...</span>
+            </div>
+            <div class="connection-info" id="connectionInfo">
+                <span id="sessionInfo">等待连接</span>
+            </div>
+        </div>
+
+        <div class="mode-toggle">
+            <label>
+                <input type="checkbox" id="streamMode" checked>
+                <span>🌊 实时流式识别模式</span>
+            </label>
+        </div>
+
+        <div class="settings">
+            <div class="setting-group">
+                <label for="language">🌐 识别语言</label>
+                <select id="language">
+                    <option value="zh_cn" selected>🇨🇳 中文</option>
+                    <option value="en_us">🇺🇸 英文</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="model">🤖 AI模型</label>
+                <select id="model">
+                    <option value="moonshot-v1-8k" selected>Moonshot V1 8K</option>
+                    <option value="moonshot-v1-32k">Moonshot V1 32K</option>
+                    <option value="moonshot-v1-128k">Moonshot V1 128K</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <button class="record-button" id="recordButton">🎤</button>
+            <div class="control-text" id="controlText">点击开始录音</div>
+            
+            <div class="audio-visualizer" id="audioVisualizer">
+                <!-- 音频可视化条将在这里动态生成 -->
+            </div>
+        </div>
+
+        <div class="processing-indicator" id="processingIndicator">
+            <div class="spinner"></div>
+            <span id="processingText">处理中...</span>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="chat-message system">
+                <div class="message-header">📡 系统消息</div>
+                正在初始化语音识别服务...
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-secondary" onclick="clearHistory()">🗑️ 清除历史</button>
+            <button class="btn btn-secondary" onclick="reconnect()">🔄 重新连接</button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let ws = null;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioContext = null;
+        let analyser = null;
+        let sessionId = null;
+        let conversationCount = 0;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 语音助手初始化中...');
+            initializeApp();
+        });
+
+        /**
+         * 初始化应用
+         */
+        async function initializeApp() {
+            try {
+                await setupMediaRecorder();
+                initializeWebSocket();
+                setupEventListeners();
+                updateControlText();
+            } catch (error) {
+                console.error('初始化失败:', error);
+                addSystemMessage('❌ 初始化失败: ' + error.message);
+            }
+        }
+
+        /**
+         * 设置事件监听器
+         */
+        function setupEventListeners() {
+            const recordButton = document.getElementById('recordButton');
+            const streamModeCheckbox = document.getElementById('streamMode');
+
+            // 录音按钮事件
+            recordButton.addEventListener('click', handleRecordButtonClick);
+            recordButton.addEventListener('mousedown', handleMouseDown);
+            recordButton.addEventListener('mouseup', handleMouseUp);
+            recordButton.addEventListener('mouseleave', handleMouseUp);
+
+            // 触摸事件（移动设备）
+            recordButton.addEventListener('touchstart', handleTouchStart);
+            recordButton.addEventListener('touchend', handleTouchEnd);
+
+            // 模式切换事件
+            streamModeCheckbox.addEventListener('change', updateControlText);
+
+            // 设置变更事件
+            document.getElementById('language').addEventListener('change', updateControlText);
+            document.getElementById('model').addEventListener('change', updateControlText);
+        }
+
+        /**
+         * 初始化WebSocket连接
+         */
+        function initializeWebSocket() {
+            // 检测协议并构建WebSocket URL
+            let wsUrl;
+            if (window.location.protocol === 'file:') {
+                wsUrl = 'ws://localhost:3000/api/realtime-voice';
+            } else {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = `${protocol}//${window.location.host}/api/realtime-voice`;
+            }
+
+            console.log('🔌 连接到WebSocket:', wsUrl);
+            updateStatus('connecting', '正在连接...');
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('✅ WebSocket连接成功');
+                updateStatus('connected', '已连接');
+                addSystemMessage('🎉 语音识别服务连接成功！');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (error) {
+                    console.error('消息解析失败:', error);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('❌ WebSocket错误:', error);
+                updateStatus('error', '连接错误');
+                addSystemMessage('❌ 连接错误，请检查服务器状态');
+            };
+
+            ws.onclose = (event) => {
+                console.log('🔒 WebSocket连接关闭');
+                updateStatus('disconnected', '连接断开');
+                addSystemMessage('🔌 连接已断开');
+                
+                // 5秒后自动重连
+                setTimeout(() => {
+                    if (!ws || ws.readyState === WebSocket.CLOSED) {
+                        console.log('🔄 尝试重新连接...');
+                        initializeWebSocket();
+                    }
+                }, 5000);
+            };
+        }
+
+        /**
+         * 处理WebSocket消息
+         */
+        function handleWebSocketMessage(message) {
+            console.log('📨 收到消息:', message.type);
+
+            switch (message.type) {
+                case 'connected':
+                    sessionId = message.sessionId;
+                    updateSessionInfo();
+                    break;
+
+                case 'recording_started':
+                    updateRecordingState(true);
+                    if (message.config?.streamMode) {
+                        addSystemMessage('🎤 开始实时录音，系统将每2秒自动识别...');
+                    } else {
+                        addSystemMessage('🎤 开始录音，松开按钮后处理...');
+                    }
+                    break;
+
+                case 'recording_stopped':
+                    updateRecordingState(false);
+                    showProcessing(message.message || '录音结束，处理中...');
+                    break;
+
+                case 'recording_progress':
+                    updateRecordingProgress(message.audioSize, message.duration);
+                    break;
+
+                case 'stream_processing':
+                    showProcessing('🔄 ' + (message.message || '实时处理中...'));
+                    break;
+
+                case 'stream_transcription':
+                    addPartialTranscription(message.data.text);
+                    break;
+
+                case 'transcription_result':
+                    hideProcessing();
+                    addUserMessage(message.data.text);
+                    showProcessing('🤖 正在生成AI回复...');
+                    break;
+
+                case 'final_transcription':
+                    clearPartialTranscription();
+                    addUserMessage(message.data.text);
+                    showProcessing('🤖 正在生成AI回复...');
+                    break;
+
+                case 'processing':
+                    showProcessing(message.message || '处理中...');
+                    break;
+
+                case 'complete_result':
+                case 'stream_complete_result':
+                    hideProcessing();
+                    clearPartialTranscription();
+                    
+                    // 如果消息中包含用户文本，先显示
+                    if (message.data.transcription?.text) {
+                        addUserMessage(message.data.transcription.text);
+                    }
+                    
+                    // 显示AI回复
+                    if (message.data.aiResponse?.message) {
+                        addAssistantMessage(message.data.aiResponse.message);
+                        conversationCount++;
+                        updateSessionInfo();
+                    }
+
+                    // 显示统计信息
+                    if (message.type === 'stream_complete_result' && message.data.transcription?.partialResults) {
+                        addSystemMessage(`✨ 实时识别完成，共处理${message.data.transcription.partialResults.length}个片段`);
+                    }
+                    break;
+
+                case 'error':
+                case 'stream_error':
+                    hideProcessing();
+                    clearPartialTranscription();
+                    addSystemMessage('❌ ' + (message.error || '处理失败'));
+                    break;
+
+                case 'history_cleared':
+                    clearChatContainer();
+                    addSystemMessage('🗑️ 对话历史已清除');
+                    conversationCount = 0;
+                    updateSessionInfo();
+                    break;
+
+                default:
+                    console.log('未知消息类型:', message.type);
+            }
+        }
+
+        /**
+         * 设置媒体录音器
+         */
+        async function setupMediaRecorder() {
+            try {
+                console.log('🎤 请求麦克风权限...');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(event.data);
+                    }
+                };
+
+                // 设置音频可视化
+                setupAudioVisualization(stream);
+
+                console.log('✅ 麦克风权限获取成功');
+                addSystemMessage('🎤 麦克风权限获取成功，可以开始录音');
+
+            } catch (error) {
+                console.error('❌ 获取麦克风权限失败:', error);
+                addSystemMessage('❌ 无法访问麦克风，请检查权限设置');
+                throw error;
+            }
+        }
+
+        /**
+         * 设置音频可视化
+         */
+        function setupAudioVisualization(stream) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                // 创建可视化条
+                const visualizer = document.getElementById('audioVisualizer');
+                visualizer.innerHTML = '';
+                for (let i = 0; i < 30; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    visualizer.appendChild(bar);
+                }
+
+                function updateVisualization() {
+                    if (!isRecording) return;
+
+                    analyser.getByteFrequencyData(dataArray);
+                    const bars = visualizer.querySelectorAll('.audio-bar');
+
+                    for (let i = 0; i < bars.length; i++) {
+                        const value = dataArray[i * 4] || 0;
+                        const height = Math.max(15, (value / 255) * 50);
+                        bars[i].style.height = height + 'px';
+                    }
+
+                    requestAnimationFrame(updateVisualization);
+                }
+
+                updateVisualization();
+            } catch (error) {
+                console.error('音频可视化设置失败:', error);
+            }
+        }
+
+        /**
+         * 处理录音按钮点击
+         */
+        function handleRecordButtonClick(event) {
+            event.preventDefault();
+            const streamMode = document.getElementById('streamMode').checked;
+            
+            if (streamMode) {
+                toggleRecording();
+            }
+        }
+
+        /**
+         * 处理鼠标按下（非流式模式）
+         */
+        function handleMouseDown(event) {
+            const streamMode = document.getElementById('streamMode').checked;
+            if (!streamMode) {
+                startRecording();
+            }
+        }
+
+        /**
+         * 处理鼠标抬起（非流式模式）
+         */
+        function handleMouseUp(event) {
+            const streamMode = document.getElementById('streamMode').checked;
+            if (!streamMode && isRecording) {
+                stopRecording();
+            }
+        }
+
+        /**
+         * 处理触摸开始
+         */
+        function handleTouchStart(event) {
+            event.preventDefault();
+            const streamMode = document.getElementById('streamMode').checked;
+            
+            if (streamMode) {
+                toggleRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        /**
+         * 处理触摸结束
+         */
+        function handleTouchEnd(event) {
+            event.preventDefault();
+            const streamMode = document.getElementById('streamMode').checked;
+            
+            if (!streamMode && isRecording) {
+                stopRecording();
+            }
+        }
+
+        /**
+         * 切换录音状态（流式模式）
+         */
+        function toggleRecording() {
+            if (!checkConnection()) return;
+
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startStreamRecording();
+            }
+        }
+
+        /**
+         * 开始流式录音
+         */
+        function startStreamRecording() {
+            if (!checkConnection() || !mediaRecorder) return;
+
+            sendWebSocketMessage({
+                type: 'toggle_recording',
+                language: document.getElementById('language').value,
+                model: document.getElementById('model').value,
+                streamMode: true
+            });
+
+            mediaRecorder.start(100);
+            isRecording = true;
+            updateRecordingUI();
+        }
+
+        /**
+         * 开始录音（传统模式）
+         */
+        function startRecording() {
+            if (!checkConnection() || !mediaRecorder) return;
+
+            sendWebSocketMessage({
+                type: 'start_recording',
+                language: document.getElementById('language').value,
+                model: document.getElementById('model').value,
+                streamMode: false
+            });
+
+            mediaRecorder.start(100);
+            isRecording = true;
+            updateRecordingUI();
+        }
+
+        /**
+         * 停止录音
+         */
+        function stopRecording() {
+            if (!isRecording) return;
+
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+
+            const streamMode = document.getElementById('streamMode').checked;
+            if (streamMode) {
+                sendWebSocketMessage({ type: 'toggle_recording' });
+            } else {
+                sendWebSocketMessage({ type: 'stop_recording' });
+            }
+
+            isRecording = false;
+            updateRecordingUI();
+        }
+
+        /**
+         * 检查连接状态
+         */
+        function checkConnection() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('❌ WebSocket未连接，无法开始录音');
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * 发送WebSocket消息
+         */
+        function sendWebSocketMessage(message) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(message));
+            }
+        }
+
+        /**
+         * 更新录音状态
+         */
+        function updateRecordingState(recording) {
+            isRecording = recording;
+            updateRecordingUI();
+        }
+
+        /**
+         * 更新录音UI
+         */
+        function updateRecordingUI() {
+            const recordButton = document.getElementById('recordButton');
+            const audioVisualizer = document.getElementById('audioVisualizer');
+            const streamMode = document.getElementById('streamMode').checked;
+
+            if (isRecording) {
+                recordButton.classList.add('recording');
+                recordButton.textContent = streamMode ? '⏹️' : '🔴';
+                audioVisualizer.style.display = 'flex';
+                updateStatus('recording', '录音中...');
+            } else {
+                recordButton.classList.remove('recording', 'processing');
+                recordButton.textContent = '🎤';
+                audioVisualizer.style.display = 'none';
+                updateStatus('connected', '已连接');
+            }
+
+            updateControlText();
+        }
+
+        /**
+         * 更新控制文本
+         */
+        function updateControlText() {
+            const controlText = document.getElementById('controlText');
+            const streamMode = document.getElementById('streamMode').checked;
+
+            if (isRecording) {
+                if (streamMode) {
+                    controlText.textContent = '实时录音中... 再次点击结束';
+                } else {
+                    controlText.textContent = '录音中... 松开按钮结束';
+                }
+            } else {
+                if (streamMode) {
+                    controlText.textContent = '点击开始实时录音';
+                } else {
+                    controlText.textContent = '按住录音，松开处理';
+                }
+            }
+        }
+
+        /**
+         * 更新录音进度
+         */
+        function updateRecordingProgress(audioSize, duration) {
+            const sizeKB = (audioSize / 1024).toFixed(1);
+            const durationSec = (duration / 1000).toFixed(1);
+            
+            const controlText = document.getElementById('controlText');
+            controlText.textContent = `录音中... ${sizeKB}KB, ${durationSec}s`;
+        }
+
+        /**
+         * 更新状态指示器
+         */
+        function updateStatus(status, text) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusDot.className = `status-dot ${status}`;
+            statusText.textContent = text;
+        }
+
+        /**
+         * 更新会话信息
+         */
+        function updateSessionInfo() {
+            const sessionInfo = document.getElementById('sessionInfo');
+            if (sessionId) {
+                const shortId = sessionId.substring(sessionId.length - 8);
+                sessionInfo.textContent = `会话: ${shortId} | 对话: ${conversationCount}轮`;
+            }
+        }
+
+        /**
+         * 显示处理指示器
+         */
+        function showProcessing(text) {
+            const indicator = document.getElementById('processingIndicator');
+            const textElement = document.getElementById('processingText');
+            
+            textElement.textContent = text;
+            indicator.classList.add('show');
+            
+            const recordButton = document.getElementById('recordButton');
+            recordButton.classList.add('processing');
+        }
+
+        /**
+         * 隐藏处理指示器
+         */
+        function hideProcessing() {
+            const indicator = document.getElementById('processingIndicator');
+            indicator.classList.remove('show');
+            
+            const recordButton = document.getElementById('recordButton');
+            recordButton.classList.remove('processing');
+            
+            updateControlText();
+        }
+
+        /**
+         * 添加系统消息
+         */
+        function addSystemMessage(text) {
+            const chatContainer = document.getElementById('chatContainer');
+            const message = document.createElement('div');
+            message.className = 'chat-message system';
+            message.innerHTML = `
+                <div class="message-header">📡 系统</div>
+                ${text}
+            `;
+            chatContainer.appendChild(message);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        /**
+         * 添加用户消息
+         */
+        function addUserMessage(text) {
+            const chatContainer = document.getElementById('chatContainer');
+            const message = document.createElement('div');
+            message.className = 'chat-message user';
+            message.innerHTML = `
+                <div class="message-header">👤 您</div>
+                ${text}
+            `;
+            chatContainer.appendChild(message);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        /**
+         * 添加助手消息
+         */
+        function addAssistantMessage(text) {
+            const chatContainer = document.getElementById('chatContainer');
+            const message = document.createElement('div');
+            message.className = 'chat-message assistant';
+            message.innerHTML = `
+                <div class="message-header">🤖 Kimi</div>
+                ${text}
+            `;
+            chatContainer.appendChild(message);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        /**
+         * 添加部分识别结果
+         */
+        function addPartialTranscription(text) {
+            const chatContainer = document.getElementById('chatContainer');
+            
+            let partialElement = document.getElementById('partialTranscription');
+            if (!partialElement) {
+                partialElement = document.createElement('div');
+                partialElement.id = 'partialTranscription';
+                partialElement.className = 'chat-message user partial';
+                chatContainer.appendChild(partialElement);
+            }
+            
+            partialElement.innerHTML = `
+                <div class="message-header">👤 您 (实时识别)</div>
+                ${text}
+            `;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        /**
+         * 清除部分识别结果
+         */
+        function clearPartialTranscription() {
+            const partialElement = document.getElementById('partialTranscription');
+            if (partialElement) {
+                partialElement.remove();
+            }
+        }
+
+        /**
+         * 清除对话历史
+         */
+        function clearHistory() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                sendWebSocketMessage({ type: 'clear_history' });
+            }
+        }
+
+        /**
+         * 清除聊天容器
+         */
+        function clearChatContainer() {
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.innerHTML = '';
+        }
+
+        /**
+         * 重新连接
+         */
+        function reconnect() {
+            if (ws) {
+                ws.close();
+            }
+            setTimeout(() => {
+                addSystemMessage('🔄 正在重新连接...');
+                initializeWebSocket();
+            }, 1000);
+        }
+
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            if (ws) {
+                ws.close();
+            }
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        });
+    </script>
+</body>
+</html>
