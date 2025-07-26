@@ -386,15 +386,10 @@ class RealtimeVoiceService {
 
       console.log('🤖 AI回复生成完成');
 
-      // 发送最终结果
+      // 发送最终结果 - 只发送AI回复，不发送转录文字
       this.sendMessage(session.ws, {
         type: 'stream_complete_result',
         data: {
-          transcription: {
-            text: finalText,
-            partialResults: session.partialResults,
-            totalDuration: Date.now() - session.startTime
-          },
           aiResponse: {
             message: chatResult.data.message,
             usage: chatResult.data.usage,
@@ -507,16 +502,10 @@ class RealtimeVoiceService {
 
       console.log('🤖 AI回复生成完成');
 
-      // 发送最终结果
+      // 发送最终结果 - 只发送AI回复，不发送转录文字
       this.sendMessage(session.ws, {
         type: 'complete_result',
         data: {
-          transcription: {
-            text: transcribedText,
-            confidence: transcriptionResult.confidence,
-            language: transcriptionResult.language,
-            duration: transcriptionResult.duration
-          },
           aiResponse: {
             message: chatResult.data.message,
             usage: chatResult.data.usage,
